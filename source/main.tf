@@ -34,7 +34,8 @@ locals {
 } */
 
 resource "aws_vpc" "this" {
-  cidr_block = "10.0.0.0/16"
+  cidr_block           = "10.0.0.0/16"
+  enable_dns_hostnames = true
 
   tags = {
     Name        = "seera-vpc"
@@ -62,7 +63,7 @@ resource "aws_subnet" "public" {
 resource "aws_subnet" "private" {
   vpc_id            = aws_vpc.this.id
   cidr_block        = "10.0.1.0/24"
-  availability_zone = "eu-west-1a"
+  availability_zone = "eu-west-1b"
 
   tags = {
     Name        = "seera-private-subnet"
@@ -128,7 +129,7 @@ resource "aws_nat_gateway" "this" {
   depends_on = [aws_internet_gateway.this]
 }
 
-resource "aws_security_group" "allow_mysql" {
+resource "aws_security_group" "db_instance" {
   name        = "seera-database-sg"
   description = "Security group for mysql database"
   vpc_id      = aws_vpc.this.id
@@ -149,7 +150,7 @@ resource "aws_security_group" "allow_mysql" {
   }
 
   tags = {
-    Name = "allow_tls"
+    Name = "allow_db_access"
   }
 }
 /*
@@ -195,17 +196,22 @@ module "database_sg" {
 ###########################
 
 resource "aws_db_instance" "this" {
-  allocated_storage    = 5
-  engine               = "mysql"
-  engine_version       = "5.7"
-  instance_class       = "db.t2.micro"
-  name                 = "seera-db"
-  username             = "user"
-  password             = "p@ssw0rd!"
-  parameter_group_name = "default.mysql5.7"
-  skip_final_snapshot  = true
-  db_subnet_group_name = aws_db_subnet_group.this.name
-  port                 = "3306"
+  identifier             = "seera-db-instance"
+  allocated_storage      = 5
+  engine                 = "mysql"
+  engine_version         = "5.7"
+  instance_class         = "db.t2.micro"
+  name                   = "seeradb"
+  username               = "user"
+  password               = "passw0rd"
+  parameter_group_name   = "default.mysql5.7"
+  skip_final_snapshot    = true
+  db_subnet_group_name   = aws_db_subnet_group.this.name
+  vpc_security_group_ids = [aws_security_group.db_instance.id]
+  publicly_accessible    = true
+  port                   = "3306"
+  availability_zone      = "eu-west-1a"
+  multi_az               = false
 
   tags = {
     Owner       = "jonasdp"
