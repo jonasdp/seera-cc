@@ -3,7 +3,7 @@
 ################################################################################
 
 provider "aws" {
-  region = var.region
+  region = var.aws_region
 }
 
 ################################################################################
@@ -13,7 +13,7 @@ provider "aws" {
 resource "aws_vpc" "this" {
   cidr_block = "10.0.0.0/16"
 
-  tags = merge({ Name = "${var.project}-vpc" }, extra_tags)
+  tags = merge({ Name = "${var.project_name}-vpc" }, var.extra_tags)
 }
 
 resource "aws_subnet" "public" {
@@ -21,7 +21,7 @@ resource "aws_subnet" "public" {
   cidr_block        = "10.0.101.0/24"
   availability_zone = "eu-west-1a"
 
-  tags = merge({ Name = "${var.project}-public" }, extra_tags)
+  tags = merge({ Name = "${var.project_name}-public" }, var.extra_tags)
 }
 
 resource "aws_subnet" "private_1" {
@@ -29,7 +29,7 @@ resource "aws_subnet" "private_1" {
   cidr_block        = "10.0.1.0/24"
   availability_zone = "eu-west-1a"
 
-  tags = merge({ Name = "${var.project}-private-1" }, extra_tags)
+  tags = merge({ Name = "${var.project_name}-private-1" }, var.extra_tags)
 }
 
 resource "aws_subnet" "private_2" {
@@ -37,20 +37,20 @@ resource "aws_subnet" "private_2" {
   cidr_block        = "10.0.2.0/24"
   availability_zone = "eu-west-1b"
 
-  tags = merge({ Name = "${var.project}-private-2" }, extra_tags)
+  tags = merge({ Name = "${var.project_name}-private-2" }, var.extra_tags)
 }
 
 resource "aws_internet_gateway" "this" {
   vpc_id = aws_vpc.this.id
 
-  tags = merge({ Name = "${var.project}-igw" }, extra_tags)
+  tags = merge({ Name = "${var.project_name}-igw" }, var.extra_tags)
 }
 
 resource "aws_nat_gateway" "this" {
   allocation_id = aws_eip.this.id
   subnet_id     = aws_subnet.public.id
 
-  tags = merge({ Name = "${var.project}-nat" }, extra_tags)
+  tags = merge({ Name = "${var.project_name}-nat" }, var.extra_tags)
 
   # To ensure proper ordering, it is recommended to add an explicit dependency
   # on the Internet Gateway for the VPC.
@@ -60,29 +60,29 @@ resource "aws_nat_gateway" "this" {
 resource "aws_eip" "this" {
   vpc = true
 
-  tags = merge({ Name = "${var.project}-eip" }, extra_tags)
+  tags = merge({ Name = "${var.project_name}-eip" }, var.extra_tags)
 }
 
 resource "aws_route_table" "private" {
-  vpc_id = aws_vpc.vpc.id
+  vpc_id = aws_vpc.this.id
 
   route {
     cidr_block = "0.0.0.0/0"
     gateway_id = aws_nat_gateway.this.id
   }
 
-  tags = merge({ Name = "${var.project}-private" }, extra_tags)
+  tags = merge({ Name = "${var.project_name}-private" }, var.extra_tags)
 }
 
 resource "aws_route_table" "public" {
-  vpc_id = aws_vpc.vpc.id
+  vpc_id = aws_vpc.this.id
 
   route {
     cidr_block = "0.0.0.0/0"
     gateway_id = aws_internet_gateway.this.id
   }
 
-  tags = merge({ Name = "${var.project}-public" }, extra_tags)
+  tags = merge({ Name = "${var.project_name}-public" }, var.extra_tags)
 }
 
 resource "aws_route_table_association" "public" {
@@ -104,10 +104,10 @@ resource "aws_route_table_association" "private_2" {
 }
 
 resource "aws_db_subnet_group" "this" {
-  name       = "${var.project}-subnetgroup"
+  name       = "${var.project_name}-subnetgroup"
   subnet_ids = [aws_subnet.private_1.id, aws_subnet.private_2.id]
 
-  tags = merge({ Name = "${var.project}-subnetgroup" }, extra_tags)
+  tags = merge({ Name = "${var.project_name}-subnetgroup" }, var.extra_tags)
 }
 
 ###########################
@@ -115,11 +115,11 @@ resource "aws_db_subnet_group" "this" {
 ###########################
 
 resource "aws_security_group" "ec2_instance" {
-  name        = "${var.project}-ec2-sg"
+  name        = "${var.project_name}-ec2-sg"
   description = "Web server security group"
   vpc_id      = aws_vpc.this.id
 
-  tags = merge({ Name = "${var.project}-ec2-sg" }, extra_tags)
+  tags = merge({ Name = "${var.project_name}-ec2-sg" }, var.extra_tags)
 
   ingress {
     protocol    = "tcp"
@@ -155,7 +155,7 @@ resource "aws_security_group" "ec2_instance" {
 ###########################
 
 resource "aws_security_group" "db_instance" {
-  name        = "${var.project}-db-sg"
+  name        = "${var.project_name}-db-sg"
   description = "Security group for mysql database"
   vpc_id      = aws_vpc.this.id
 
@@ -174,7 +174,7 @@ resource "aws_security_group" "db_instance" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = merge({ Name = "${var.project}-db-sg" }, extra_tags)
+  tags = merge({ Name = "${var.project_name}-db-sg" }, var.extra_tags)
 }
 
 ###########################
@@ -182,7 +182,7 @@ resource "aws_security_group" "db_instance" {
 ###########################
 
 resource "aws_db_instance" "this" {
-  identifier             = "${var.project}-db-instance"
+  identifier             = "${var.project_name}-db-instance"
   allocated_storage      = 5
   engine                 = "mysql"
   engine_version         = "5.7"
@@ -195,7 +195,7 @@ resource "aws_db_instance" "this" {
   db_subnet_group_name   = aws_db_subnet_group.this.name
   vpc_security_group_ids = [aws_security_group.db_instance.id]
 
-  tags = merge({ Name = "${var.project}-db-instance" }, extra_tags)
+  tags = merge({ Name = "${var.project_name}-db-instance" }, var.extra_tags)
 }
 
 ###########################
@@ -203,6 +203,6 @@ resource "aws_db_instance" "this" {
 ###########################
 
 resource "aws_key_pair" "this" {
-  key_name   = "${var.project}-keypair"
+  key_name   = "${var.project_name}-keypair"
   public_key = file(var.ssh_public_key)
 }
