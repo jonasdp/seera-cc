@@ -213,3 +213,107 @@ resource "aws_key_pair" "this" {
   key_name   = "${var.project_name}-keypair"
   public_key = file(var.ssh_public_key)
 }
+
+data "template_file" "phpconfig" {
+  template = file("wp-provision/wp-config.php")
+
+  vars = {
+    db_port = aws_db_instance.this.port
+    db_host = aws_db_instance.this.address
+    db_user = var.db_user
+    db_pass = var.db_password
+    db_name = var.db_name
+  }
+}
+
+
+resource "aws_instance" "ec2" {
+  ami           = data.aws_ami.ubuntu.id
+  instance_type = "t2.micro"
+
+  depends_on = [
+    aws_db_instance.this,
+  ]
+
+  key_name                    = aws_key_pair.this.key_name
+  vpc_security_group_ids      = [aws_security_group.ec2_instance.id]
+  subnet_id                   = aws_subnet.public.id
+  associate_public_ip_address = true
+
+  user_data = file("wp-provision/wp-provision.sh")
+
+  tags = {
+    Name = "EC2 Instance"
+  }
+
+  provisioner "file" {
+    source      = "wp-provision/wp-provision.sh"
+    destination = "/tmp/wp-provision.sh"
+
+    connection {
+      type        = "ssh"
+      user        = "ubuntu"
+      host        = self.public_ip
+      private_key = file(var.ssh_private_key)
+    }
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "chmod +x /tmp/wp-provision.sh",
+      "/tmp/wp-provision.sh",
+    ]
+
+    connection {
+      type        = "ssh"
+      user        = "ubuntu"
+      host        = self.public_ip
+      private_key = file(var.ssh_private_key)
+    }
+  }
+
+  provisioner "file" {
+    content     = data.template_file.phpconfig.rendered
+    destination = "/tmp/wp-config.php"
+
+    connection {
+      type        = "ssh"
+      user        = "ubuntu"
+      host        = self.public_ip
+      private_key = file(var.ssh_private_key)
+    }
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "sudo cp /tmp/wp-config.php /var/www/html/wp-config.php",
+    ]
+
+    connection {
+      type        = "ssh"
+      user        = "ubuntu"
+      host        = self.public_ip
+      private_key = file(var.ssh_private_key)
+    }
+  }
+
+  timeouts {
+    create = "20m"
+  }
+}
+
+data "aws_ami" "ubuntu" {
+  most_recent = true
+
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu-groovy-20.10-amd64-server-*"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+
+  owners = ["099720109477"]
+}
