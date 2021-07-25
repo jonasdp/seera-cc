@@ -1,4 +1,7 @@
 # Seera Code Challenge
+[![Version](https://img.shields.io/badge/Version-1.0-green)]()
+[![Terraform](https://img.shields.io/badge/Terraform-1.0.3-blueviolet)](https://www.terraform.io)
+[![AWS](https://img.shields.io/badge/aws-3.51.0-orange)](https://registry.terraform.io/providers/hashicorp/azurerm/3.51.0)
 
 Bring up a WordPress stack using any of the infrastructures as code tools (Cloudformation / Terraform). This should create new VPC with subnets, route tables, etc. The database should use RDS.
 
@@ -12,3 +15,20 @@ You can use any tools of your choice (CF, terraform, Ansible, Docker, Mesos, ECS
 
 ![Seera Network](seera-networking.png)
 
+## Providers
+
+| Name | Version |
+|------|---------|
+| terraform | >1.0.3 |
+
+## Usage
+
+### Create infrastructure and provisioning
+
+1. `terraform init`
+2. `terraform plan -var-file=dev.tfvars -out=tfplan`
+3. `terraform apply -auto-approve -input=false tfplan`
+
+### Delete the resources
+
+1. `terraform destroy -auto-approve -var-file=dev.tfvars`
