@@ -241,8 +241,8 @@ resource "aws_instance" "this" {
   tags = merge({ Name = "${var.project_name}-ec2-instance" }, var.extra_tags)
 
   provisioner "file" {
-    source      = "wp-provision/wp-provision.sh"
-    destination = "/tmp/wp-provision.sh"
+    source      = "wp-provision/apache.conf"
+    destination = "/tmp/apache.conf"
 
     connection {
       type        = "ssh"
@@ -255,8 +255,7 @@ resource "aws_instance" "this" {
 
   provisioner "remote-exec" {
     inline = [
-      "chmod +x /tmp/wp-provision.sh",
-      "/tmp/wp-provision.sh",
+      "sudo cp /tmp/apache.conf /etc/apache2/sites-available/wordpress.conf",
     ]
 
     connection {
@@ -283,7 +282,36 @@ resource "aws_instance" "this" {
 
   provisioner "remote-exec" {
     inline = [
-      "sudo cp /tmp/wp-config.php /var/www/html/wp-config.php",
+      "sudo cp /tmp/wp-config.php /etc/wordpress/config-${self.public_ip}.php",
+    ]
+
+    connection {
+      type        = "ssh"
+      user        = "ubuntu"
+      agent       = false
+      host        = self.public_ip
+      private_key = file(var.ssh_private_key)
+    }
+  }
+  /*
+  provisioner "file" {
+    source      = "wp-provision/wp-provision.sh"
+    destination = "/tmp/wp-provision.sh"
+
+    connection {
+      type        = "ssh"
+      user        = "ubuntu"
+      agent       = false
+      host        = self.public_ip
+      private_key = file(var.ssh_private_key)
+    }
+  }
+*/
+  provisioner "remote-exec" {
+    inline = [
+      "sudo a2ensite wordpress",
+      "sudo a2enmod rewrite",
+      "sudo service apache2 reload"
     ]
 
     connection {
@@ -326,23 +354,23 @@ data "aws_partition" "current" {
 
 # Cloudwatch alarm that auto-recover the instance if the system status check fails for two minutes
 resource "aws_cloudwatch_metric_alarm" "auto-recover" {
-  alarm_name          = "${var.project_name}-${aws_instance.this.instance_id}-StatusCheckFailed"
-  metric_name         = var.metric_name         //StatusCheckFailed_System
-  comparison_operator = var.comparison_operator //GreaterThanThreshold
-  evaluation_periods  = var.evaluation_periods  // 2
+  alarm_name          = "${var.project_name}-${aws_instance.this.id}-StatusCheckFailed"
+  metric_name         = "StatusCheckFailed_System"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = "2"
 
   dimensions = {
     InstanceId = aws_instance.this.id
   }
 
-  namespace         = var.namespace            // AWS/EC2
-  period            = var.max_failure_duration //60
-  statistic         = var.statistic            // Minimum
-  threshold         = var.threshold            // 0
+  namespace         = "AWS/EC2"
+  period            = "60"
+  statistic         = "Minimum"
+  threshold         = "0"
   alarm_description = "Cloudwatch alarm that auto-recover the instance if the system status check fails for two minutes"
   alarm_actions = compact(
     [
-      "arn:${data.aws_partition.current.partition}:automate:${data.aws_region.current.name}:ec2:recover",
+      "arn:${data.aws_partition.current.partition}:automate:${var.aws_region}:ec2:recover",
     ]
   )
 }

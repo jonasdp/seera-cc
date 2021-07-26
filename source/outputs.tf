@@ -1,4 +1,4 @@
-output "db_access" {
+output "db_access_ec2" {
   value = "mysql -h ${aws_db_instance.this.address} -P ${aws_db_instance.this.port} -u ${var.db_user} -p ${var.db_name}"
 }
 
@@ -7,5 +7,5 @@ output "ssh_access" {
 }
 
 output "web_access" {
-  value = "http://${aws_instance.this.public_ip}/index.php"
+  value = "http://${aws_instance.this.public_ip}/seera"
 }
