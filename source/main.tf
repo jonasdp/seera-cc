@@ -226,6 +226,13 @@ data "template_file" "phpconfig" {
   }
 }
 
+data "template_file" "apacheconfig" {
+  template = file("wp-provision/apache.conf")
+
+  vars = {
+    url_alias = var.project_name
+  }
+}
 
 resource "aws_instance" "this" {
   ami           = data.aws_ami.ubuntu.id
@@ -241,7 +248,7 @@ resource "aws_instance" "this" {
   tags = merge({ Name = "${var.project_name}-ec2-instance" }, var.extra_tags)
 
   provisioner "file" {
-    source      = "wp-provision/apache.conf"
+    content     = data.template_file.apacheconfig.rendered
     destination = "/tmp/apache.conf"
 
     connection {
