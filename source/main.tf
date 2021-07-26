@@ -227,13 +227,9 @@ data "template_file" "phpconfig" {
 }
 
 
-resource "aws_instance" "ec2" {
+resource "aws_instance" "this" {
   ami           = data.aws_ami.ubuntu.id
   instance_type = "t2.micro"
-
-  depends_on = [
-    aws_db_instance.this,
-  ]
 
   key_name                    = aws_key_pair.this.key_name
   vpc_security_group_ids      = [aws_security_group.ec2_instance.id]
@@ -242,9 +238,7 @@ resource "aws_instance" "ec2" {
 
   user_data = file("wp-provision/wp-provision.sh")
 
-  tags = {
-    Name = "EC2 Instance"
-  }
+  tags = merge({ Name = "${var.project_name}-ec2-instance" }, var.extra_tags)
 
   provisioner "file" {
     source      = "wp-provision/wp-provision.sh"
@@ -253,6 +247,7 @@ resource "aws_instance" "ec2" {
     connection {
       type        = "ssh"
       user        = "ubuntu"
+      agent       = false
       host        = self.public_ip
       private_key = file(var.ssh_private_key)
     }
@@ -267,6 +262,7 @@ resource "aws_instance" "ec2" {
     connection {
       type        = "ssh"
       user        = "ubuntu"
+      agent       = false
       host        = self.public_ip
       private_key = file(var.ssh_private_key)
     }
@@ -279,6 +275,7 @@ resource "aws_instance" "ec2" {
     connection {
       type        = "ssh"
       user        = "ubuntu"
+      agent       = false
       host        = self.public_ip
       private_key = file(var.ssh_private_key)
     }
@@ -292,6 +289,7 @@ resource "aws_instance" "ec2" {
     connection {
       type        = "ssh"
       user        = "ubuntu"
+      agent       = false
       host        = self.public_ip
       private_key = file(var.ssh_private_key)
     }
@@ -300,6 +298,10 @@ resource "aws_instance" "ec2" {
   timeouts {
     create = "20m"
   }
+
+  depends_on = [
+    aws_db_instance.this
+  ]
 }
 
 data "aws_ami" "ubuntu" {
@@ -316,4 +318,31 @@ data "aws_ami" "ubuntu" {
   }
 
   owners = ["099720109477"]
+}
+
+# Lookup the current AWS partition
+data "aws_partition" "current" {
+}
+
+# Cloudwatch alarm that auto-recover the instance if the system status check fails for two minutes
+resource "aws_cloudwatch_metric_alarm" "auto-recover" {
+  alarm_name          = "${var.project_name}-${aws_instance.this.instance_id}-StatusCheckFailed"
+  metric_name         = var.metric_name         //StatusCheckFailed_System
+  comparison_operator = var.comparison_operator //GreaterThanThreshold
+  evaluation_periods  = var.evaluation_periods  // 2
+
+  dimensions = {
+    InstanceId = aws_instance.this.id
+  }
+
+  namespace         = var.namespace            // AWS/EC2
+  period            = var.max_failure_duration //60
+  statistic         = var.statistic            // Minimum
+  threshold         = var.threshold            // 0
+  alarm_description = "Cloudwatch alarm that auto-recover the instance if the system status check fails for two minutes"
+  alarm_actions = compact(
+    [
+      "arn:${data.aws_partition.current.partition}:automate:${data.aws_region.current.name}:ec2:recover",
+    ]
+  )
 }
