@@ -52,35 +52,7 @@ resource "aws_internet_gateway" "this" {
 
   tags = merge({ Name = "${var.project_name}-igw" }, var.extra_tags)
 }
-/*
-resource "aws_nat_gateway" "this" {
-  allocation_id = aws_eip.this.id
-  subnet_id     = aws_subnet.public.id
 
-  tags = merge({ Name = "${var.project_name}-nat" }, var.extra_tags)
-
-  # To ensure proper ordering, it is recommended to add an explicit dependency
-  # on the Internet Gateway for the VPC.
-  depends_on = [aws_internet_gateway.this]
-}
-
-resource "aws_eip" "this" {
-  vpc = true
-
-  tags = merge({ Name = "${var.project_name}-eip" }, var.extra_tags)
-}
-
-resource "aws_route_table" "private" {
-  vpc_id = aws_vpc.this.id
-
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_nat_gateway.this.id
-  }
-
-  tags = merge({ Name = "${var.project_name}-private" }, var.extra_tags)
-}
-*/
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.this.id
 
@@ -97,19 +69,7 @@ resource "aws_route_table_association" "public" {
 
   subnet_id = aws_subnet.public.id
 }
-/*
-resource "aws_route_table_association" "private_1" {
-  route_table_id = aws_route_table.private.id
 
-  subnet_id = aws_subnet.private_1.id
-}
-
-resource "aws_route_table_association" "private_2" {
-  route_table_id = aws_route_table.private.id
-
-  subnet_id = aws_subnet.private_2.id
-}
-*/
 resource "aws_db_subnet_group" "this" {
   name       = "${var.project_name}-subnetgroup"
   subnet_ids = [aws_subnet.private_1.id, aws_subnet.private_2.id]

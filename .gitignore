@@ -27,3 +27,10 @@ override.tf.json
 
 # Include tfplan files to ignore the plan output of command: terraform plan -out=tfplan
 *tfplan*
+
+# Don't commit the keys
+id_seera
+id_seera.*
+
+# Dont need to commit the tf lock file even though it's normally good
+.terraform.lock.hcl
