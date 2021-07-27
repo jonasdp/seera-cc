@@ -1,7 +1,7 @@
 # Seera Code Challenge
 
 [![Version](https://img.shields.io/badge/Version-1.0-green)]()
-[![Terraform](https://img.shields.io/badge/Terraform-1.0.3-blueviolet)](https://www.terraform.io)
+[![Terraform](https://img.shields.io/badge/Terraform-1.0.2-blueviolet)](https://www.terraform.io)
 [![AWS](https://img.shields.io/badge/aws-3.51.0-orange)](https://registry.terraform.io/providers/hashicorp/azurerm/3.51.0)
 
 ## Task & Requirements
@@ -22,10 +22,12 @@ You can use any tools of your choice (CF, terraform, Ansible, Docker, Mesos, ECS
 
 | Name | Version |
 |------|---------|
-| terraform | >1.0.3 |
-| aws | >3.5.1.0 |
+| terraform | >1.0.2 |
+| aws | >3.5.1 |
+| time | >0.7.2 |
+| null | >3.1.0 |
 
-Usage
+## Usage
 
 ### Variables
 
@@ -85,6 +87,6 @@ terraform destroy -auto-approve -var-file=dev.tfvars
 
 ### SSH Agent Problem
 
-In  the remote connection to the ec2 instance I used `agent = false` at line 294 in `main.tf`. I did it because I run git-bash on Windows 10.
+In  the remote connection to the ec2 instance I used `agent = false` at line 294 in `main.tf`. I did it because I run git-bash on Windows 10 with no agent running.
 
 I'm unaware if this might become a problem when running the script on Linux or OSX and having an agent running. If there is a problem with the last step of `main.tf` then change the variable to `agent = true`. 

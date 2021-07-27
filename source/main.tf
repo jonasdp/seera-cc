@@ -274,10 +274,10 @@ resource "aws_cloudwatch_metric_alarm" "auto_recover" {
 ######################################################
 # To make sure the ec2 is running and finsihed the apt installs
 ######################################################
-resource "time_sleep" "wait_60_seconds" {
+resource "time_sleep" "wait_120_seconds" {
   depends_on = [aws_instance.ec2]
 
-  create_duration = "60s"
+  create_duration = "120s"
 }
 
 ######################################################
@@ -317,6 +317,6 @@ resource "null_resource" "congifure_ec2" {
   }
 
   depends_on = [
-    time_sleep.wait_60_seconds
+    time_sleep.wait_120_seconds
   ]
 }
