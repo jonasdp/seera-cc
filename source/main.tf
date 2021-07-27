@@ -1,21 +1,21 @@
-################################################################################
+###############################################################################
 # Providers
-################################################################################
+###############################################################################
 
 provider "aws" {
   region = var.aws_region
 }
 
-################################################################################
+###############################################################################
 # Loccal variables
-################################################################################
+###############################################################################
 locals {
   alpha_project_name = replace(var.project_name, "/[^a-zA-Z0-9]/", "")
 }
 
-################################################################################
+###############################################################################
 # Networking
-################################################################################
+###############################################################################
 
 resource "aws_vpc" "this" {
   cidr_block = "10.0.0.0/16"
@@ -52,7 +52,7 @@ resource "aws_internet_gateway" "this" {
 
   tags = merge({ Name = "${var.project_name}-igw" }, var.extra_tags)
 }
-
+/*
 resource "aws_nat_gateway" "this" {
   allocation_id = aws_eip.this.id
   subnet_id     = aws_subnet.public.id
@@ -80,7 +80,7 @@ resource "aws_route_table" "private" {
 
   tags = merge({ Name = "${var.project_name}-private" }, var.extra_tags)
 }
-
+*/
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.this.id
 
@@ -97,7 +97,7 @@ resource "aws_route_table_association" "public" {
 
   subnet_id = aws_subnet.public.id
 }
-
+/*
 resource "aws_route_table_association" "private_1" {
   route_table_id = aws_route_table.private.id
 
@@ -109,7 +109,7 @@ resource "aws_route_table_association" "private_2" {
 
   subnet_id = aws_subnet.private_2.id
 }
-
+*/
 resource "aws_db_subnet_group" "this" {
   name       = "${var.project_name}-subnetgroup"
   subnet_ids = [aws_subnet.private_1.id, aws_subnet.private_2.id]
@@ -117,9 +117,9 @@ resource "aws_db_subnet_group" "this" {
   tags = merge({ Name = "${var.project_name}-subnetgroup" }, var.extra_tags)
 }
 
-###########################
+######################################################
 # EC2 Security Group
-###########################
+######################################################
 
 resource "aws_security_group" "ec2_instance" {
   name        = "${var.project_name}-ec2-sg"
@@ -157,9 +157,9 @@ resource "aws_security_group" "ec2_instance" {
   }
 }
 
-###########################
+######################################################
 # DB Security Group
-###########################
+######################################################
 
 resource "aws_security_group" "db_instance" {
   name        = "${var.project_name}-db-sg"
@@ -184,11 +184,11 @@ resource "aws_security_group" "db_instance" {
   tags = merge({ Name = "${var.project_name}-db-sg" }, var.extra_tags)
 }
 
-###########################
+######################################################
 # MySQL DB
-###########################
+######################################################
 
-resource "aws_db_instance" "this" {
+resource "aws_db_instance" "mysql" {
   identifier             = "${var.project_name}-db-instance"
   allocated_storage      = 5
   engine                 = "mysql"
@@ -205,21 +205,25 @@ resource "aws_db_instance" "this" {
   tags = merge({ Name = "${var.project_name}-db-instance" }, var.extra_tags)
 }
 
-###########################
+######################################################
 # SSH keys
-###########################
+######################################################
 
 resource "aws_key_pair" "this" {
   key_name   = "${var.project_name}-keypair"
   public_key = file(var.ssh_public_key)
 }
 
+######################################################
+# Config files that WP need
+######################################################
+
 data "template_file" "phpconfig" {
   template = file("wp-provision/wp-config.php")
 
   vars = {
-    db_port = aws_db_instance.this.port
-    db_host = aws_db_instance.this.address
+    db_port = aws_db_instance.mysql.port
+    db_host = aws_db_instance.mysql.address
     db_user = var.db_user
     db_pass = var.db_password
     db_name = var.db_name
@@ -234,7 +238,11 @@ data "template_file" "apacheconfig" {
   }
 }
 
-resource "aws_instance" "this" {
+######################################################
+# The EC2 instance for WP
+######################################################
+
+resource "aws_instance" "ec2" {
   ami           = data.aws_ami.ubuntu.id
   instance_type = "t2.micro"
 
@@ -246,113 +254,9 @@ resource "aws_instance" "this" {
   user_data = file("wp-provision/wp-provision.sh")
 
   tags = merge({ Name = "${var.project_name}-ec2-instance" }, var.extra_tags)
-  /* 
-  provisioner "remote-exec" {
-    inline = [
-      "sudo apt update -y",
-      "sleep 10",
-      "sudo apt install wordpress php libapache2-mod-php php-mysql -y",
-      "sleep 10"
-    ]
-
-    connection {
-      type        = "ssh"
-      user        = "ubuntu"
-      agent       = false
-      host        = self.public_ip
-      private_key = file(var.ssh_private_key)
-    }
-  }
-
-  provisioner "file" {
-    content     = data.template_file.apacheconfig.rendered
-    destination = "/tmp/apache.conf"
-
-    connection {
-      type        = "ssh"
-      user        = "ubuntu"
-      agent       = false
-      host        = self.public_ip
-      private_key = file(var.ssh_private_key)
-    }
-  }
-
-  provisioner "remote-exec" {
-    inline = [
-      "sudo mkdir /etc/apache2",
-      "sudo mkdir /etc/apache2/sites-available",
-      "sudo cp /tmp/apache.conf /etc/apache2/sites-available/wordpress.conf",
-    ]
-
-    connection {
-      type        = "ssh"
-      user        = "ubuntu"
-      agent       = false
-      host        = self.public_ip
-      private_key = file(var.ssh_private_key)
-    }
-  }
-
-  provisioner "file" {
-    content     = data.template_file.phpconfig.rendered
-    destination = "/tmp/wp-config.php"
-
-    connection {
-      type        = "ssh"
-      user        = "ubuntu"
-      agent       = false
-      host        = self.public_ip
-      private_key = file(var.ssh_private_key)
-    }
-  }
-
-  provisioner "remote-exec" {
-    inline = [
-      "sudo mkdir /etc/wordpress",
-      "sudo cp /tmp/wp-config.php /etc/wordpress/config-${self.public_ip}.php",
-    ]
-
-    connection {
-      type        = "ssh"
-      user        = "ubuntu"
-      agent       = false
-      host        = self.public_ip
-      private_key = file(var.ssh_private_key)
-    }
-  }
-
-  provisioner "file" {
-    source      = "wp-provision/wp-provision.sh"
-    destination = "/tmp/wp-provision.sh"
-
-    connection {
-      type        = "ssh"
-      user        = "ubuntu"
-      agent       = false
-      host        = self.public_ip
-      private_key = file(var.ssh_private_key)
-    }
-  }
-
-  provisioner "remote-exec" {
-    inline = [
-      "sudo a2ensite wordpress",
-      "sudo a2enmod rewrite",
-      "sudo service apache2 reload"
-    ]
-
-    connection {
-      type        = "ssh"
-      user        = "ubuntu"
-      agent       = false
-      host        = self.public_ip
-      private_key = file(var.ssh_private_key)
-    }
-  }
-*/
 
   depends_on = [
-    aws_db_instance.this
+    aws_db_instance.mysql
   ]
 }
 
@@ -372,26 +276,30 @@ data "aws_ami" "ubuntu" {
   owners = ["099720109477"]
 }
 
+######################################################
 # Lookup the current AWS partition
+######################################################
 data "aws_partition" "current" {
 }
 
-# Cloudwatch alarm that auto-recover the instance if the system status check fails for two minutes
-resource "aws_cloudwatch_metric_alarm" "auto-recover" {
-  alarm_name          = "${var.project_name}-${aws_instance.this.id}-StatusCheckFailed"
+######################################################
+# Cloudwatch alarm that auto_recover the instance if the system status check fails for two minutes
+######################################################
+resource "aws_cloudwatch_metric_alarm" "auto_recover" {
+  alarm_name          = "${var.project_name}-${aws_instance.ec2.id}-StatusCheckFailed"
   metric_name         = "StatusCheckFailed_System"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = "2"
 
   dimensions = {
-    InstanceId = aws_instance.this.id
+    InstanceId = aws_instance.ec2.id
   }
 
   namespace         = "AWS/EC2"
   period            = "60"
   statistic         = "Minimum"
   threshold         = "0"
-  alarm_description = "Cloudwatch alarm that auto-recover the instance if the system status check fails for two minutes"
+  alarm_description = "Cloudwatch alarm that auto-recovers the instance if the system status check fails for two minutes"
   alarm_actions = compact(
     [
       "arn:${data.aws_partition.current.partition}:automate:${var.aws_region}:ec2:recover",
@@ -399,27 +307,32 @@ resource "aws_cloudwatch_metric_alarm" "auto-recover" {
   )
 
   depends_on = [
-    aws_instance.this
+    aws_instance.ec2
   ]
 }
 
+######################################################
 # To make sure the ec2 is running and finsihed the apt installs
+######################################################
 resource "time_sleep" "wait_60_seconds" {
-  depends_on = [aws_instance.this]
+  depends_on = [aws_instance.ec2]
 
   create_duration = "60s"
 }
 
+######################################################
+# Configuring and setting up WP
+######################################################
 resource "null_resource" "congifure_ec2" {
   triggers = {
-    public_ip = aws_instance.this.public_ip
+    public_ip = aws_instance.ec2.public_ip
   }
 
   connection {
     type        = "ssh"
     user        = "ubuntu"
     agent       = false
-    host        = aws_instance.this.public_ip
+    host        = aws_instance.ec2.public_ip
     private_key = file(var.ssh_private_key)
   }
 
@@ -435,7 +348,7 @@ resource "null_resource" "congifure_ec2" {
 
   provisioner "remote-exec" {
     inline = [
-      "sudo cp /tmp/wp-config.php /etc/wordpress/config-${aws_instance.this.public_ip}.php",
+      "sudo cp /tmp/wp-config.php /etc/wordpress/config-${aws_instance.ec2.public_ip}.php",
       "sudo cp /tmp/apache.conf /etc/apache2/sites-available/wordpress.conf",
       "sudo a2ensite wordpress",
       "sudo a2enmod rewrite",

@@ -1,4 +1,5 @@
 # Seera Code Challenge
+
 [![Version](https://img.shields.io/badge/Version-1.0-green)]()
 [![Terraform](https://img.shields.io/badge/Terraform-1.0.3-blueviolet)](https://www.terraform.io)
 [![AWS](https://img.shields.io/badge/aws-3.51.0-orange)](https://registry.terraform.io/providers/hashicorp/azurerm/3.51.0)
@@ -23,12 +24,59 @@ You can use any tools of your choice (CF, terraform, Ansible, Docker, Mesos, ECS
 
 ## Usage
 
-### Create infrastructure and provisioning
+### Variables
 
-1. `terraform init`
-2. `terraform plan -var-file=dev.tfvars -out=tfplan`
-3. `terraform apply -auto-approve -input=false tfplan`
+Change the variables in `dev.tfvars` to suite your needs if needed
 
-### Delete the resources
+### Steps
 
-1. `terraform destroy -auto-approve -var-file=dev.tfvars`
+#### 1. Create SSH Key
+
+Go to the source directory:
+
+```
+cd source
+```
+
+Run:
+
+```shell
+ssh-keygen -t rsa -N "" -f id_seera
+```
+
+#### 2. Create infrastructure and provision WordPress
+
+Run the following commands one after another:
+
+```shell
+terraform init
+```
+
+```shell
+terraform plan -var-file=dev.tfvars -out=tfplan
+```
+
+```shell
+terraform apply -auto-approve -input=false tfplan
+```
+
+#### 3. Look at the output from Terraform
+
+Should look something like this:
+
+![](output.png)
+
+#### 4. Setup WordPress
+
+Go to the link in the `web_access` output variable from the previous step and create your blog.
+
+![](web-screen.png)
+
+### How to delete the resources
+
+Run the following command to delete all resources created.
+
+```shell
+terraform destroy -auto-approve -var-file=dev.tfvars
+```
+

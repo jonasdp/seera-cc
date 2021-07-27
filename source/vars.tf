@@ -23,7 +23,6 @@ variable "db_password" {
   type        = string
 }
 
-
 variable "ssh_public_key" {
   description = "Public key for ec2 instance"
   type        = string
