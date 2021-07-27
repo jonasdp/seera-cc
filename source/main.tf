@@ -246,6 +246,23 @@ resource "aws_instance" "this" {
   user_data = file("wp-provision/wp-provision.sh")
 
   tags = merge({ Name = "${var.project_name}-ec2-instance" }, var.extra_tags)
+  /* 
+  provisioner "remote-exec" {
+    inline = [
+      "sudo apt update -y",
+      "sleep 10",
+      "sudo apt install wordpress php libapache2-mod-php php-mysql -y",
+      "sleep 10"
+    ]
+
+    connection {
+      type        = "ssh"
+      user        = "ubuntu"
+      agent       = false
+      host        = self.public_ip
+      private_key = file(var.ssh_private_key)
+    }
+  }
 
   provisioner "file" {
     content     = data.template_file.apacheconfig.rendered
@@ -262,6 +279,8 @@ resource "aws_instance" "this" {
 
   provisioner "remote-exec" {
     inline = [
+      "sudo mkdir /etc/apache2",
+      "sudo mkdir /etc/apache2/sites-available",
       "sudo cp /tmp/apache.conf /etc/apache2/sites-available/wordpress.conf",
     ]
 
@@ -289,6 +308,7 @@ resource "aws_instance" "this" {
 
   provisioner "remote-exec" {
     inline = [
+      "sudo mkdir /etc/wordpress",
       "sudo cp /tmp/wp-config.php /etc/wordpress/config-${self.public_ip}.php",
     ]
 
@@ -300,7 +320,7 @@ resource "aws_instance" "this" {
       private_key = file(var.ssh_private_key)
     }
   }
-  /*
+
   provisioner "file" {
     source      = "wp-provision/wp-provision.sh"
     destination = "/tmp/wp-provision.sh"
@@ -313,7 +333,7 @@ resource "aws_instance" "this" {
       private_key = file(var.ssh_private_key)
     }
   }
-*/
+
   provisioner "remote-exec" {
     inline = [
       "sudo a2ensite wordpress",
@@ -329,10 +349,7 @@ resource "aws_instance" "this" {
       private_key = file(var.ssh_private_key)
     }
   }
-
-  timeouts {
-    create = "20m"
-  }
+*/
 
   depends_on = [
     aws_db_instance.this
@@ -380,4 +397,53 @@ resource "aws_cloudwatch_metric_alarm" "auto-recover" {
       "arn:${data.aws_partition.current.partition}:automate:${var.aws_region}:ec2:recover",
     ]
   )
+
+  depends_on = [
+    aws_instance.this
+  ]
+}
+
+# To make sure the ec2 is running and finsihed the apt installs
+resource "time_sleep" "wait_60_seconds" {
+  depends_on = [aws_instance.this]
+
+  create_duration = "60s"
+}
+
+resource "null_resource" "congifure_ec2" {
+  triggers = {
+    public_ip = aws_instance.this.public_ip
+  }
+
+  connection {
+    type        = "ssh"
+    user        = "ubuntu"
+    agent       = false
+    host        = aws_instance.this.public_ip
+    private_key = file(var.ssh_private_key)
+  }
+
+  provisioner "file" {
+    content     = data.template_file.apacheconfig.rendered
+    destination = "/tmp/apache.conf"
+  }
+
+  provisioner "file" {
+    content     = data.template_file.phpconfig.rendered
+    destination = "/tmp/wp-config.php"
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "sudo cp /tmp/wp-config.php /etc/wordpress/config-${aws_instance.this.public_ip}.php",
+      "sudo cp /tmp/apache.conf /etc/apache2/sites-available/wordpress.conf",
+      "sudo a2ensite wordpress",
+      "sudo a2enmod rewrite",
+      "sudo service apache2 reload"
+    ]
+  }
+
+  depends_on = [
+    time_sleep.wait_60_seconds
+  ]
 }
