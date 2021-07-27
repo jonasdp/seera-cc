@@ -4,6 +4,8 @@
 [![Terraform](https://img.shields.io/badge/Terraform-1.0.3-blueviolet)](https://www.terraform.io)
 [![AWS](https://img.shields.io/badge/aws-3.51.0-orange)](https://registry.terraform.io/providers/hashicorp/azurerm/3.51.0)
 
+## Task & Requirements
+
 Bring up a WordPress stack using any of the infrastructures as code tools (Cloudformation / Terraform). This should create new VPC with subnets, route tables, etc. The database should use RDS.
 
 The service should be fault tolerant (no need of HA). In case of a server failure, during termination of existing server, a new server should come up and configure everything automatically. The service should come back to existing state without any manual interventions.
@@ -21,12 +23,13 @@ You can use any tools of your choice (CF, terraform, Ansible, Docker, Mesos, ECS
 | Name | Version |
 |------|---------|
 | terraform | >1.0.3 |
+| aws | >3.5.1.0 |
 
-## Usage
+Usage
 
 ### Variables
 
-Change the variables in `dev.tfvars` to suite your needs if needed
+Even though there is no need you can change the variables in `dev.tfvars` to suite your needs. (the key names variables will affect the ssh key creation)
 
 ### Steps
 
@@ -80,3 +83,8 @@ Run the following command to delete all resources created.
 terraform destroy -auto-approve -var-file=dev.tfvars
 ```
 
+### SSH Agent Problem
+
+In  the remote connection to the ec2 instance I used `agent = false` at line 294 in `main.tf`. I did it because I run git-bash on Windows 10.
+
+I'm unaware if this might become a problem when running the script on Linux or OSX and having an agent running. If there is a problem with the last step of `main.tf` then change the variable to `agent = true`. 
